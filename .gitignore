@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+models/gesture_recognizer.task
+models/gesture_model.pkl
+training_data/*.csv
+.DS_Store
+*.egg-info/
+dist/
+build/
