@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hand Gesture → Sentence | Raspberry Pi</title>
+    <meta name="description" content="Real-time hand gesture recognition forming sentences on Raspberry Pi">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --border: rgba(99, 102, 241, 0.2);
+            --border-glow: rgba(99, 102, 241, 0.5);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #475569;
+            --accent: #6366f1;
+            --accent-light: #818cf8;
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.3);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.3);
+            --danger: #ef4444;
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%);
+            --gradient-2: linear-gradient(135deg, #0a0e1a 0%, #1e1b4b 100%);
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.06);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--gradient-2);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ─── Animated background ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background:
+                radial-gradient(circle at 20% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 40%),
+                radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 40%);
+            animation: bgShift 20s ease-in-out infinite;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        @keyframes bgShift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(2%, -2%) rotate(1deg); }
+            66% { transform: translate(-1%, 1%) rotate(-0.5deg); }
+        }
+
+        /* ─── Layout ─── */
+        .app {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-height: 100vh;
+            gap: 20px;
+        }
+
+        /* ─── Header ─── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-title h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-title .icon {
+            font-size: 1.5rem;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        .fps-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* ─── Main content ─── */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ─── Video feed ─── */
+        .video-container {
+            position: relative;
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            overflow: hidden;
+            backdrop-filter: blur(20px);
+            aspect-ratio: 4/3;
+        }
+
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+        }
+
+        .gesture-indicator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gesture-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .gesture-word {
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            background: var(--accent);
+            color: white;
+            animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .confidence-bar {
+            margin-top: 8px;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.2s ease, background 0.3s ease;
+        }
+
+        /* ─── Progress ring ─── */
+        .progress-container {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 60px;
+            height: 60px;
+        }
+
+        .progress-ring {
+            width: 60px;
+            height: 60px;
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring-bg {
+            fill: none;
+            stroke: rgba(255,255,255,0.1);
+            stroke-width: 4;
+        }
+
+        .progress-ring-fill {
+            fill: none;
+            stroke: var(--accent-light);
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-dasharray: 157;
+            stroke-dashoffset: 157;
+            transition: stroke-dashoffset 0.15s ease, stroke 0.3s ease;
+        }
+
+        .progress-ring-fill.complete {
+            stroke: var(--success);
+        }
+
+        .progress-text {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* ─── Sidebar ─── */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(20px);
+        }
+
+        .card-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        /* ─── Gesture map ─── */
+        .gesture-map {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .gesture-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            font-size: 0.78rem;
+            transition: all 0.2s ease;
+        }
+
+        .gesture-item.active {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
+        }
+
+        .gesture-item .name {
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+
+        .gesture-item .word {
+            color: var(--accent-light);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ─── Controls ─── */
+        .controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            background: var(--glass);
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--accent);
+            color: var(--text-primary);
+        }
+
+        .btn.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        /* ─── History ─── */
+        .history-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .history-list::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .history-list::-webkit-scrollbar-thumb {
+            background: var(--text-muted);
+            border-radius: 2px;
+        }
+
+        .history-item {
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            0% { transform: translateX(-10px); opacity: 0; }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+
+        .history-empty {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-style: italic;
+        }
+
+        /* ─── Sentence bar (bottom) ─── */
+        .sentence-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px 28px;
+            backdrop-filter: blur(20px);
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s ease;
+        }
+
+        .sentence-bar.has-content {
+            border-color: var(--border-glow);
+        }
+
+        .sentence-bar.word-added {
+            animation: sentenceFlash 0.5s ease;
+        }
+
+        @keyframes sentenceFlash {
+            0% { border-color: var(--success); box-shadow: 0 0 20px var(--success-glow); }
+            100% { border-color: var(--border-glow); box-shadow: none; }
+        }
+
+        .sentence-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .sentence-text {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            line-height: 1.4;
+            min-height: 1.6em;
+        }
+
+        .sentence-text.empty {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 1.1rem;
+        }
+
+        .sentence-cursor {
+            display: inline-block;
+            width: 3px;
+            height: 1.4em;
+            background: var(--accent);
+            margin-left: 4px;
+            vertical-align: text-bottom;
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .word-count {
+            position: absolute;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* ─── Word pop animation ─── */
+        .word-pop {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: 800;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            pointer-events: none;
+            z-index: 100;
+            animation: wordPopAnim 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        @keyframes wordPopAnim {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+            40% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+            100% { transform: translate(-50%, -60%) scale(0.8); opacity: 0; }
+        }
+
+        /* ─── Loading state ─── */
+        .video-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: var(--bg-secondary);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--glass-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .video-loading p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-title">
+                <span class="icon">🤟</span>
+                <h1>Hand Gesture → Sentence</h1>
+            </div>
+            <div style="display:flex; align-items:center; gap:16px;">
+                <span class="fps-display" id="fps">-- FPS</span>
+                <div class="status-badge">
+                    <span class="status-dot"></span>
+                    Live
+                </div>
+            </div>
+        </header>
+
+        <!-- Main -->
+        <div class="main-content">
+            <!-- Video feed -->
+            <div class="video-container">
+                <div class="video-loading" id="videoLoading">
+                    <div class="spinner"></div>
+                    <p>Connecting to camera...</p>
+                </div>
+                <img id="videoFeed" src="/video_feed" alt="Camera Feed"
+                     onload="document.getElementById('videoLoading').style.display='none'"
+                     onerror="document.getElementById('videoLoading').style.display='flex'">
+
+                <!-- Progress ring -->
+                <div class="progress-container" id="progressContainer" style="display:none;">
+                    <svg class="progress-ring" viewBox="0 0 60 60">
+                        <circle class="progress-ring-bg" cx="30" cy="30" r="25"/>
+                        <circle class="progress-ring-fill" id="progressRing" cx="30" cy="30" r="25"/>
+                    </svg>
+                    <div class="progress-text" id="progressText">0%</div>
+                </div>
+
+                <!-- Gesture overlay -->
+                <div class="video-overlay" id="gestureOverlay" style="display:none;">
+                    <div class="gesture-indicator">
+                        <span class="gesture-name" id="gestureName"></span>
+                        <span class="gesture-word" id="gestureWord"></span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Gesture map -->
+                <div class="card">
+                    <div class="card-title">Gesture → Word Map</div>
+                    <div class="gesture-map" id="gestureMap"></div>
+                </div>
+
+                <!-- Controls -->
+                <div class="card">
+                    <div class="card-title">Controls</div>
+                    <div class="controls">
+                        <button class="btn" onclick="undoWord()" title="Remove last word">
+                            ↩ Undo
+                        </button>
+                        <button class="btn danger" onclick="clearSentence()" title="Clear all">
+                            ✕ Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History -->
+                <div class="card">
+                    <div class="card-title">Sentence History</div>
+                    <ul class="history-list" id="historyList">
+                        <li class="history-empty">No sentences yet</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sentence bar -->
+        <div class="sentence-bar" id="sentenceBar">
+            <div class="sentence-label">Formed Sentence</div>
+            <div class="sentence-text empty" id="sentenceText">
+                Show hand gestures to build a sentence...
+                <span class="sentence-cursor"></span>
+            </div>
+            <span class="word-count" id="wordCount"></span>
+        </div>
+    </div>
+
+    <script>
+        // ─── State ───
+        let lastSentence = "";
+        let lastWordAdded = null;
+        let gestureMap = {};
+
+        // ─── Load gesture map ───
+        async function loadGestureMap() {
+            try {
+                const res = await fetch("/api/gestures");
+                gestureMap = await res.json();
+                renderGestureMap();
+            } catch (e) {
+                console.error("Failed to load gesture map:", e);
+            }
+        }
+
+        function renderGestureMap() {
+            const container = document.getElementById("gestureMap");
+            container.innerHTML = "";
+            for (const [gesture, word] of Object.entries(gestureMap)) {
+                const item = document.createElement("div");
+                item.className = "gesture-item";
+                item.id = `gm-${gesture}`;
+                item.innerHTML = `
+                    <span class="name">${formatGestureName(gesture)}</span>
+                    <span class="word">${word}</span>
+                `;
+                container.appendChild(item);
+            }
+        }
+
+        function formatGestureName(name) {
+            return name.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        // ─── Poll state ───
+        async function pollState() {
+            try {
+                const res = await fetch("/api/state");
+                const data = await res.json();
+                updateUI(data);
+            } catch (e) {
+                // Ignore transient errors
+            }
+        }
+
+        function updateUI(data) {
+            // FPS
+            document.getElementById("fps").textContent = `${data.fps.toFixed(1)} FPS`;
+
+            // Gesture overlay
+            const overlay = document.getElementById("gestureOverlay");
+            const progressContainer = document.getElementById("progressContainer");
+
+            if (data.gesture && data.gesture_word) {
+                overlay.style.display = "block";
+                document.getElementById("gestureName").textContent = formatGestureName(data.gesture);
+                document.getElementById("gestureWord").textContent = data.gesture_word;
+
+                // Confidence bar
+                const fill = document.getElementById("confidenceFill");
+                const pct = Math.round(data.confidence * 100);
+                fill.style.width = pct + "%";
+                fill.style.background = pct > 70
+                    ? "var(--success)"
+                    : pct > 40
+                    ? "var(--warning)"
+                    : "var(--danger)";
+
+                // Highlight active gesture in map
+                document.querySelectorAll(".gesture-item").forEach(el => el.classList.remove("active"));
+                const activeEl = document.getElementById(`gm-${data.gesture}`);
+                if (activeEl) activeEl.classList.add("active");
+            } else {
+                overlay.style.display = "none";
+                document.querySelectorAll(".gesture-item").forEach(el => el.classList.remove("active"));
+            }
+
+            // Progress ring
+            if (data.status === "building" && data.progress > 0) {
+                progressContainer.style.display = "block";
+                const ring = document.getElementById("progressRing");
+                const circumference = 2 * Math.PI * 25; // r=25
+                const offset = circumference * (1 - data.progress);
+                ring.style.strokeDashoffset = offset;
+                ring.classList.toggle("complete", data.progress >= 1);
+                document.getElementById("progressText").textContent =
+                    Math.round(data.progress * 100) + "%";
+            } else {
+                progressContainer.style.display = "none";
+            }
+
+            // Sentence
+            const sentenceBar = document.getElementById("sentenceBar");
+            const sentenceText = document.getElementById("sentenceText");
+            const wordCount = document.getElementById("wordCount");
+
+            if (data.current_sentence && data.current_sentence.length > 0) {
+                sentenceText.className = "sentence-text";
+                sentenceText.innerHTML = data.current_sentence +
+                    '<span class="sentence-cursor"></span>';
+                sentenceBar.classList.add("has-content");
+                wordCount.textContent = `${data.word_count} word${data.word_count !== 1 ? 's' : ''}`;
+            } else {
+                sentenceText.className = "sentence-text empty";
+                sentenceText.innerHTML =
+                    'Show hand gestures to build a sentence...' +
+                    '<span class="sentence-cursor"></span>';
+                sentenceBar.classList.remove("has-content");
+                wordCount.textContent = "";
+            }
+
+            // Word added flash
+            if (data.last_word_added && data.last_word_added !== lastWordAdded) {
+                lastWordAdded = data.last_word_added;
+                sentenceBar.classList.remove("word-added");
+                void sentenceBar.offsetWidth; // force reflow
+                sentenceBar.classList.add("word-added");
+                showWordPop(data.last_word_added);
+            }
+
+            // History
+            if (data.history && data.history.length > 0) {
+                const list = document.getElementById("historyList");
+                list.innerHTML = "";
+                data.history.slice().reverse().forEach(s => {
+                    const li = document.createElement("li");
+                    li.className = "history-item";
+                    li.textContent = s;
+                    list.appendChild(li);
+                });
+            }
+
+            lastSentence = data.current_sentence;
+        }
+
+        function showWordPop(word) {
+            const pop = document.createElement("div");
+            pop.className = "word-pop";
+            pop.textContent = `+ ${word}`;
+            document.body.appendChild(pop);
+            setTimeout(() => pop.remove(), 800);
+        }
+
+        // ─── Controls ───
+        async function clearSentence() {
+            await fetch("/api/clear", { method: "POST" });
+        }
+
+        async function undoWord() {
+            await fetch("/api/undo", { method: "POST" });
+        }
+
+        // ─── Init ───
+        loadGestureMap();
+        setInterval(pollState, 200); // Poll every 200ms
+    </script>
+</body>
+</html>
