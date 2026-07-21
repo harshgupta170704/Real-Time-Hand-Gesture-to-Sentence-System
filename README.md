@@ -201,6 +201,24 @@ python main.py --port 8080           # Custom web server port
 
 ---
 
+## 🍓 Raspberry Pi Support
+
+This project can also run on a **Raspberry Pi** using the official Pi Camera Module! We have kept the core code exactly the same, but provided a dedicated launcher script so you don't have to touch the Windows/Laptop code.
+
+To run it on a Raspberry Pi:
+1. Connect your Pi Camera module and ensure it is enabled in `raspi-config`.
+2. Give execute permissions to the launcher script:
+   ```bash
+   chmod +x run_pi.sh
+   ```
+3. Run the script:
+   ```bash
+   ./run_pi.sh
+   ```
+This script automatically uses the `--camera picamera` flag which optimizes the video feed for the Raspberry Pi's hardware without affecting your main laptop settings.
+
+---
+
 ## ⚙️ Configuration
 
 Modify `config.py` to fine-tune performance:
