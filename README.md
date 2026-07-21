@@ -194,9 +194,25 @@ TTS_ENABLED = True
 TTS_RATE = 150             # Words per minute
 ```
 
+## 📸 Screenshots / Demo
+
+*(Add your testing pictures here! Just replace the placeholder paths with your actual image paths)*
+
+<div align="center">
+  <img src="https://via.placeholder.com/800x450.png?text=UI+Dashboard+Screenshot" alt="UI Dashboard" width="800"/>
+  <br/>
+  <i>Web Dashboard showing live gesture recognition</i>
+</div>
+<br/>
+<div align="center">
+  <img src="https://via.placeholder.com/800x450.png?text=Sentence+Grammar+Screenshot" alt="Sentence Grammar" width="800"/>
+  <br/>
+  <i>Grammar Engine correcting sentences in real-time</i>
+</div>
+
 ---
 
-## 🔮 Future Roadmap
+## ⚡ Features Roadmap
 
 - [ ] **Custom Model Training:** Transfer learning for custom gesture vocabularies.
 - [ ] **Dynamic Grammar Correction:** Lightweight NLP to fix sentence grammar.
