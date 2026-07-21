@@ -3,14 +3,15 @@ Real-Time Hand Gesture to Sentence System
 ==========================================
 Main application — runs the processing pipeline and serves a web UI.
 
-View the output on your laptop browser at:
-    http://<your-pi-ip>:5000
+Optimized for laptop webcam with real-time performance.
+Uses Google's free pre-trained MediaPipe Gesture Recognizer model.
 
-Optimized for Raspberry Pi 4 Model B + Camera Module v2.
+View the output in your browser at:
+    http://localhost:5000
 
 Usage:
-    python main.py                    # Run with Pi Camera v2
-    python main.py --camera webcam    # Run with USB webcam (desktop testing)
+    python main.py                    # Run with laptop webcam (default)
+    python main.py --camera picamera  # Run with Pi Camera v2
 """
 
 import sys
@@ -20,14 +21,13 @@ import cv2
 import numpy as np
 import config
 from camera import Camera
-from hand_detector import HandDetector
 from gesture_classifier import GestureClassifier
 from sentence_builder import SentenceBuilder
 import web_server
 
 
-def get_pi_ip():
-    """Try to detect the Pi's local IP address."""
+def get_local_ip():
+    """Try to detect the machine's local IP address."""
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -44,9 +44,15 @@ class GestureToSentenceApp:
 
     def __init__(self, camera_source=None):
         self.camera = Camera(source=camera_source)
-        self.detector = HandDetector()
         self.classifier = GestureClassifier()
         self.builder = SentenceBuilder()
+
+        # HandDetector is only needed for rule-based fallback
+        # (mp.solutions was removed in newer MediaPipe versions)
+        self.detector = None
+        if self.classifier.classifier_type == "rule":
+            from hand_detector import HandDetector
+            self.detector = HandDetector()
 
         # FPS tracking
         self.fps = 0.0
@@ -58,24 +64,26 @@ class GestureToSentenceApp:
 
     def run(self):
         """Main processing loop."""
-        ip = get_pi_ip()
+        ip = get_local_ip()
         print()
-        print("╔══════════════════════════════════════════════════╗")
-        print("║   🤟 HAND GESTURE → SENTENCE SYSTEM             ║")
-        print("║   Raspberry Pi 4B + Camera v2                   ║")
-        print("╠══════════════════════════════════════════════════╣")
-        print("║                                                  ║")
-        print(f"║   Open in your laptop browser:                   ║")
-        print(f"║   👉 http://{ip}:{config.WEB_PORT:<25s}       ║")
-        print("║                                                  ║")
-        print("╠══════════════════════════════════════════════════╣")
-        print("║   Gestures recognized:                           ║")
+        print("+==================================================+")
+        print("|   HAND GESTURE -> SENTENCE SYSTEM                |")
+        print("|   Real-Time Laptop Webcam Edition                |")
+        print("+==================================================+")
+        print("|                                                  |")
+        port = str(config.WEB_PORT)
+        print(f"|   Open in your browser:                          |")
+        print(f"|   http://localhost:{port:<29s}|")
+        print(f"|   http://{ip}:{port:<29s}      |")
+        print("|                                                  |")
+        print("+--------------------------------------------------+")
+        print("|   Gestures recognized:                           |")
         gestures = self.classifier.get_all_gestures()
         for gesture, word in gestures.items():
-            print(f"║     {gesture:20s} → {word:<20s}   ║")
-        print("║                                                  ║")
-        print("║   Press Ctrl+C to stop                           ║")
-        print("╚══════════════════════════════════════════════════╝")
+            print(f"|     {gesture:20s} -> {word:<20s}   |")
+        print("|                                                  |")
+        print("|   Press Ctrl+C to stop                           |")
+        print("+==================================================+")
         print()
 
         # Start the web server (runs in background thread)
@@ -116,6 +124,9 @@ class GestureToSentenceApp:
                 if web_server.check_undo_requested():
                     self.builder.undo_last_word()
                     print("  [Undo from web UI]")
+                if web_server.check_speak_requested():
+                    self.builder.speak()
+                    print("  [Speaking sentence from web UI]")
 
                 # 5. Feed to sentence builder
                 builder_result = self.builder.update(gesture_result)
@@ -124,7 +135,7 @@ class GestureToSentenceApp:
                 if builder_result["word_added"]:
                     self.last_word_added = builder_result["word_added"]
                     print(
-                        f"  + \"{builder_result['word_added']}\" → "
+                        f"  + \"{builder_result['word_added']}\" -> "
                         f"\"{builder_result['current_sentence']}\""
                     )
 
@@ -145,6 +156,7 @@ class GestureToSentenceApp:
                     "last_word_added": self.last_word_added,
                     "history": self.builder.get_history(),
                     "fps": self.fps,
+                    "raw_words": self.builder.get_raw_words(),
                 })
 
                 # 9. Update FPS
@@ -155,7 +167,8 @@ class GestureToSentenceApp:
             print("\n[App] Shutting down...")
         finally:
             self.camera.stop()
-            self.detector.close()
+            if self.detector:
+                self.detector.close()
             print("[App] Done.")
 
     def _process_with_task_api(self, frame_rgb):
@@ -165,6 +178,9 @@ class GestureToSentenceApp:
 
     def _process_with_rule_based(self, frame_rgb):
         """Process a frame using MediaPipe Hands + rule-based classifier."""
+        if self.detector is None:
+            from hand_detector import HandDetector
+            self.detector = HandDetector()
         detection = self.detector.detect(frame_rgb)
         finger_states = self.detector.get_finger_states(detection["landmarks"])
         result = self.classifier.classify(
@@ -181,7 +197,7 @@ class GestureToSentenceApp:
         h, w = frame_bgr.shape[:2]
 
         # Draw hand landmarks (for rule-based mode)
-        if self.classifier.classifier_type == "rule":
+        if self.classifier.classifier_type == "rule" and self.detector:
             detection = gesture_result.get("_detection")
             if detection and config.SHOW_LANDMARKS:
                 self.detector.draw_landmarks(frame_bgr, detection["raw_results"])
@@ -251,12 +267,12 @@ class GestureToSentenceApp:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Hand Gesture → Sentence | Raspberry Pi 4B"
+        description="Hand Gesture -> Sentence | Real-Time Laptop Webcam"
     )
     parser.add_argument(
         "--camera", choices=["picamera", "webcam"],
         default=config.CAMERA_SOURCE,
-        help="Camera source (default: picamera)",
+        help="Camera source (default: webcam)",
     )
     parser.add_argument(
         "--classifier", choices=["mediapipe_task", "rule"],
@@ -267,12 +283,18 @@ def main():
         "--port", type=int, default=config.WEB_PORT,
         help="Web server port (default: 5000)",
     )
+    parser.add_argument(
+        "--no-tts", action="store_true",
+        help="Disable text-to-speech",
+    )
     args = parser.parse_args()
 
     if args.classifier:
         config.CLASSIFIER_TYPE = args.classifier
     if args.port:
         config.WEB_PORT = args.port
+    if args.no_tts:
+        config.TTS_ENABLED = False
 
     app = GestureToSentenceApp(camera_source=args.camera)
     app.run()

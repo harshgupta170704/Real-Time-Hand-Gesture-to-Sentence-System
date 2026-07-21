@@ -50,14 +50,14 @@ def download_model():
         print()
 
         size_mb = os.path.getsize(dest) / (1024 * 1024)
-        print(f"\n✓ Download complete! ({size_mb:.1f} MB)")
+        print(f"\n[OK] Download complete! ({size_mb:.1f} MB)")
         print(f"  Saved to: {dest}")
         print(f"\n  The model recognizes these gestures:")
         for gesture, word in config.GESTURE_WORD_MAP.items():
-            print(f"    {gesture:15s} → \"{word}\"")
+            print(f"    {gesture:15s} -> \"{word}\"")
 
     except Exception as e:
-        print(f"\n✗ Download failed: {e}")
+        print(f"\n[FAIL] Download failed: {e}")
         print("\n  Manual download:")
         print(f"    1. Visit: {url}")
         print(f"    2. Save to: {os.path.abspath(dest)}")
