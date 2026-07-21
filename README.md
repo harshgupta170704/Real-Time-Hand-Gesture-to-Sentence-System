@@ -196,18 +196,28 @@ TTS_RATE = 150             # Words per minute
 
 ## 📸 Screenshots / Demo
 
-*(Add your testing pictures here! Just replace the placeholder paths with your actual image paths)*
-
 <div align="center">
-  <img src="https://via.placeholder.com/800x450.png?text=UI+Dashboard+Screenshot" alt="UI Dashboard" width="800"/>
+  <img src="docs/peace.png" alt="Peace Sign Gesture" width="800"/>
   <br/>
-  <i>Web Dashboard showing live gesture recognition</i>
+  <i>Recognizing the "Peace Sign" gesture mapped to the word "want"</i>
 </div>
 <br/>
 <div align="center">
-  <img src="https://via.placeholder.com/800x450.png?text=Sentence+Grammar+Screenshot" alt="Sentence Grammar" width="800"/>
+  <img src="docs/thumbs_up.png" alt="Thumbs Up Gesture" width="800"/>
   <br/>
-  <i>Grammar Engine correcting sentences in real-time</i>
+  <i>Recognizing the "Thumbs Up" gesture mapped to the word "yes"</i>
+</div>
+<br/>
+<div align="center">
+  <img src="docs/index_up.png" alt="Index Up Gesture" width="800"/>
+  <br/>
+  <i>Recognizing the "Index Up" gesture mapped to the word "I"</i>
+</div>
+<br/>
+<div align="center">
+  <img src="docs/middle_only.png" alt="Middle Only Gesture" width="800"/>
+  <br/>
+  <i>Recognizing the custom "Middle Only" gesture mapped to the word "go"</i>
 </div>
 
 ---
