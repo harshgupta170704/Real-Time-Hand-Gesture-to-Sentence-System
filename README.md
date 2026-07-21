@@ -13,6 +13,36 @@
 
 ---
 
+## 📸 Screenshots / Demo
+
+<div align="center">
+  <img src="docs/peace.png" alt="Peace Sign Gesture" width="800"/>
+  <br/>
+  <i>Recognizing the "Peace Sign" gesture mapped to the word "want"</i>
+</div>
+<br/>
+<div align="center">
+  <img src="docs/thumbs_up.png" alt="Thumbs Up Gesture" width="800"/>
+  <br/>
+  <i>Recognizing the "Thumbs Up" gesture mapped to the word "yes"</i>
+</div>
+<br/>
+<div align="center">
+  <img src="docs/index_up.png" alt="Index Up Gesture" width="800"/>
+  <br/>
+  <i>Recognizing the "Index Up" gesture mapped to the word "I"</i>
+</div>
+<br/>
+<div align="center">
+  <img src="docs/middle_only.png" alt="Middle Only Gesture" width="800"/>
+  <br/>
+  <i>Recognizing the custom "Middle Only" gesture mapped to the word "go"</i>
+</div>
+
+---
+
+---
+
 ## 💡 About the Project
 
 This project translates real-time hand gestures into text sentences using your laptop's built-in webcam. All inference happens **locally** — no cloud APIs, no internet required during use.
@@ -194,33 +224,6 @@ TTS_ENABLED = True
 TTS_RATE = 150             # Words per minute
 ```
 
-## 📸 Screenshots / Demo
-
-<div align="center">
-  <img src="docs/peace.png" alt="Peace Sign Gesture" width="800"/>
-  <br/>
-  <i>Recognizing the "Peace Sign" gesture mapped to the word "want"</i>
-</div>
-<br/>
-<div align="center">
-  <img src="docs/thumbs_up.png" alt="Thumbs Up Gesture" width="800"/>
-  <br/>
-  <i>Recognizing the "Thumbs Up" gesture mapped to the word "yes"</i>
-</div>
-<br/>
-<div align="center">
-  <img src="docs/index_up.png" alt="Index Up Gesture" width="800"/>
-  <br/>
-  <i>Recognizing the "Index Up" gesture mapped to the word "I"</i>
-</div>
-<br/>
-<div align="center">
-  <img src="docs/middle_only.png" alt="Middle Only Gesture" width="800"/>
-  <br/>
-  <i>Recognizing the custom "Middle Only" gesture mapped to the word "go"</i>
-</div>
-
----
 
 ## ⚡ Features Roadmap
 
